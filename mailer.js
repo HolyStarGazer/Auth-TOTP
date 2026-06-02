@@ -25,7 +25,9 @@
  * Nodemailer docs: https://nodemailer.com/smtp/
  */
 
+require ('dotenv').config();
 const nodemailer = require('nodemailer');
+const transporter = createTransporter();
 
 /**
  * Creates and returns a configured Nodemailer transporter.
@@ -58,8 +60,17 @@ function createTransporter() {
   // true (the default) so Nodemailer verifies Gmail's cert.
   // ──────────────────────────────────────────────────────
 
-  // TODO: create and return the transporter
-
+  // create and return the transporter
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // use STARTTLS
+    requireTLS: true, // refuse  to authenticate over plaintext, even if STARTTLS fails
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD
+    }
+  });
 }
 
 /**
@@ -95,8 +106,23 @@ async function sendCode(recipientEmail, code) {
   // security model assumes the email account is secure.
   // ──────────────────────────────────────────────────────
 
-  // TODO: compose and send the email
+  // compose and send the email
+  transporter.verify((err, success) => {
+    if (err) {
+      console.error('SMTP verify FAILED:', err);
+    } else {
+      console.log('SMTP verify OK - ready to send');
+    }
+  })
 
+  const message = {
+    from: process.env.GMAIL_USER,
+    to: recipientEmail,
+    subject: 'Your TOTP Authentication Code',
+    text: `Your authentication code is: ${code}\nThis code expires in 30 seconds.`,
+  };
+
+  return await transporter.sendMail(message);
 }
 
 module.exports = { sendCode };
