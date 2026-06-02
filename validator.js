@@ -70,7 +70,7 @@ function verifyCode(email, submittedCode, currentTime = Math.floor(Date.now() / 
   // If null, the user doesn't exist — return invalid.
   // ──────────────────────────────────────────────────────
 
-  // TODO: get the secret
+  // get the secret
   const secret = retrieveSecret(email);
   if (!secret) {
     return { valid: false, message: 'User not found' };
@@ -86,7 +86,7 @@ function verifyCode(email, submittedCode, currentTime = Math.floor(Date.now() / 
   // attempt of the OTP after the successful validation."
   // ──────────────────────────────────────────────────────
 
-  // TODO: check the usedCodes map
+  // check the usedCodes map
   // usedCodes map format: {email -> {code, timestamp}}
   if (usedCodes.has(email) && usedCodes.get(email).some(entry => entry.code === submittedCode)) {
     return { valid: false, message: 'Code has already been used' };
@@ -117,7 +117,7 @@ function verifyCode(email, submittedCode, currentTime = Math.floor(Date.now() / 
   //       suggest you need a small refactor — that's expected.
   // ──────────────────────────────────────────────────────
 
-  // TODO: check the submitted code against allowed windows
+  // check the submitted code against allowed windows
   // Get the user's current drift offset (default to 0 if not set)
   const drift = clockDrift.get(email) || 0;
 
@@ -133,7 +133,7 @@ function verifyCode(email, submittedCode, currentTime = Math.floor(Date.now() / 
   //   Return { valid: false, message: '...' }
   // ──────────────────────────────────────────────────────
 
-  // TODO: handle match/no-match
+  // handle match/no-match
   for (const delta of [0, -1, +1]) {
     const code = generateTOTP(secret, 30, 0, 6, 'sha1', currentTime + (drift + delta) * 30);
     if (submittedCode === code) {
@@ -182,7 +182,7 @@ function verifyCode(email, submittedCode, currentTime = Math.floor(Date.now() / 
  * @param {string} code - The code that was just verified
  */
 function markCodeUsed(email, code) {
-  // TODO: store the code with a timestamp for later cleanup
+  // store the code with a timestamp for later cleanup
   const timestamp = Date.now() / 1000; // store in seconds for easier comparison
   
   if (!usedCodes.has(email)) {
@@ -201,7 +201,7 @@ function markCodeUsed(email, code) {
  * This prevents the usedCodes map from growing unbounded.
  */
 function pruneExpiredCodes() {
-  // TODO: iterate and remove old entries
+  // iterate and remove old entries
   const now = Date.now() / 1000;
 
   for (const [email, entries] of usedCodes.entries()) {
