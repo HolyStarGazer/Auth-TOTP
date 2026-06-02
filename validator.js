@@ -60,6 +60,7 @@ const DRIFT_CONFIRM = 3;        // require 3 consecutive matches before committi
  *
  * @param {string} email - The user's email
  * @param {string} submittedCode - The 6-digit code the user entered
+ * @param {number} currentTime - The current time in seconds since the Unix epoch (optional, for testing)
  * @returns {object} - { valid: boolean, message: string }
  */
 function verifyCode(email, submittedCode, currentTime = Math.floor(Date.now() / 1000)) {
@@ -180,16 +181,15 @@ function verifyCode(email, submittedCode, currentTime = Math.floor(Date.now() / 
  *
  * @param {string} email - The user's email
  * @param {string} code - The code that was just verified
+ * @param {number} currentTime - The current time in seconds since the Unix epoch
  */
-function markCodeUsed(email, code) {
+function markCodeUsed(email, code, currentTime = Date.now() / 1000) {
   // store the code with a timestamp for later cleanup
-  const timestamp = Date.now() / 1000; // store in seconds for easier comparison
-  
   if (!usedCodes.has(email)) {
     usedCodes.set(email, []);
   }
 
-  usedCodes.get(email).push({ code, timestamp });
+  usedCodes.get(email).push({ code, timestamp: currentTime });
 }
 
 /**
@@ -199,13 +199,13 @@ function markCodeUsed(email, code) {
  * Remove any entries older than 2 * timeStep seconds.
  *
  * This prevents the usedCodes map from growing unbounded.
+ * 
+ * @param {number} currentTime - The current time in seconds since the Unix epoch
  */
-function pruneExpiredCodes() {
+function pruneExpiredCodes(currentTime = Date.now() / 1000) {
   // iterate and remove old entries
-  const now = Date.now() / 1000;
-
   for (const [email, entries] of usedCodes.entries()) {
-    const validEntries = entries.filter(entry => now - entry.timestamp < 60); // keep entries from the last 60 seconds
+    const validEntries = entries.filter(entry => currentTime - entry.timestamp < 60); // keep entries from the last 60 seconds
 
     if (validEntries.length > 0) {
       usedCodes.set(email, validEntries);
