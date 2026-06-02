@@ -153,7 +153,18 @@ function generateSecret(algorithm = 'sha1') {
   // ──────────────────────────────────────────────────────
 
   // TODO: generate and return a random key of the correct length
+  const keyLengths = {
+    'sha1': 20,
+    'sha256': 32,
+    'sha512': 64
+  };
 
+  const length = keyLengths[algorithm.toLowerCase()];
+  if (!length) {
+    throw new Error(`Unsupported algorithm: ${algorithm}`);
+  }
+
+  return crypto.randomBytes(length);
 }
 
 module.exports = { generateTOTP, generateSecret };
