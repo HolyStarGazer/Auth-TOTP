@@ -32,6 +32,7 @@
  *     (they are not secret, but are required for decryption)
  */
 
+require('dotenv').config();
 const crypto = require('crypto');
 
 // In-memory store. Maps email → { ciphertext, iv, authTag }
@@ -60,8 +61,15 @@ function encrypt(plaintext, masterKey) {
   // 5. Return { ciphertext, iv, authTag }
   // ──────────────────────────────────────────────────────
 
-  // TODO: implement AES-256-GCM encryption
+  // implement AES-256-GCM encryption
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
+  const part1 = cipher.update(plaintext); // returns encoded buffer
+  const part2 = cipher.final();           // GCM has no padding; finalizes GHASH so getAuthTag() works
+  const ciphertext = Buffer.concat([part1, part2]);
+  const authTag = cipher.getAuthTag();
 
+  return { ciphertext, iv, authTag };
 }
 
 /**
@@ -88,8 +96,13 @@ function decrypt(ciphertext, iv, authTag, masterKey) {
   // 4. Return the concatenated plaintext Buffer.
   // ──────────────────────────────────────────────────────
 
-  // TODO: implement AES-256-GCM decryption
+  // implement AES-256-GCM decryption
+  const decipher = crypto.createDecipheriv('aes-256-gcm', masterKey, iv);
+  decipher.setAuthTag(authTag);
+  const part1 = decipher.update(ciphertext);
+  const part2 = decipher.final();
 
+  return Buffer.concat([part1, part2]);
 }
 
 /**
@@ -111,8 +124,16 @@ function storeSecret(email, secret) {
   //           Overwrite? Reject? Up to you.
   // ──────────────────────────────────────────────────────
 
-  // TODO: encrypt and store the secret
-
+  // implement AES-256-GCM encryption and storage
+  const masterKey = Buffer.from(process.env.MASTER_ENCRYPTION_KEY, 'hex');
+  const { ciphertext, iv, authTag } = encrypt(secret, masterKey);
+  
+  if (hasUser(email)) {
+    // For simplicity, we'll allow overwriting existing secrets.
+    console.warn(`Warning: overwriting existing secret for ${email}`);
+  }
+  
+  store.set(email, { ciphertext, iv, authTag });
 }
 
 /**
@@ -144,8 +165,15 @@ function retrieveSecret(email) {
   //       That's a stretch goal here.
   // ──────────────────────────────────────────────────────
 
-  // TODO: retrieve and decrypt the secret
+  // implement retrieval and decryption of the secret
+  if (!hasUser(email)) {
+    return null;
+  }
 
+  const masterKey = Buffer.from(process.env.MASTER_ENCRYPTION_KEY, 'hex');
+  const { ciphertext, iv, authTag } = store.get(email);
+
+  return decrypt(ciphertext, iv, authTag, masterKey);
 }
 
 /**
@@ -155,8 +183,8 @@ function retrieveSecret(email) {
  * @returns {boolean}
  */
 function hasUser(email) {
-  // TODO: check the store Map
-
+  // implement user existence check
+  return store.has(email);
 }
 
 module.exports = { storeSecret, retrieveSecret, hasUser };
