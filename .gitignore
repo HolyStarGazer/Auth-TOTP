@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Secrets and local config
+.env
+.env.local
+*.local
+
+# TLS keys must never be committed; allow only the README into git
+certs/*
+!certs/README.md
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
