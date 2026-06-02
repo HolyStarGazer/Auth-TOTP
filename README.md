@@ -11,10 +11,10 @@ and exposes an HTTPS endpoint for the client to submit the code for verification
 ## Architecture
 
 ```
-┌──────────┐    HTTPS     ┌──────────┐    TLS/SMTP    ┌───────┐
+┌───────────┐    HTTPS    ┌───────────┐    TLS/SMTP   ┌────────┐
 │  Client   │ ──────────> │  Server   │ ────────────> │ Gmail  │
-│ (client/) │ POST /verify│ (server/) │  sends code   │  SMTP  │
-└──────────┘              └──────────┘                └───────┘
+│ (client/) │ POST /verify│ (server/) │   sends code  │  SMTP  │
+└───────────┘             └───────────┘               └────────┘
 ```
 
 ## File Overview
