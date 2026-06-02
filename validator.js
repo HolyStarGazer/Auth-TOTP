@@ -47,6 +47,13 @@ const usedCodes = new Map();
 // Track per-user clock drift (§6).
 // Maps email → number of time steps of detected drift.
 const clockDrift = new Map();
+const MAX_DRIFT = 1;            // maximum drift to track in either direction (e.g., +-1 time step = +-30 seconds). 
+                                // RFC 4226 §7.4 recommends s=1 but a maximum s=50
+                                // I'm allowing +- 1 step so the window is effectively 3 steps (total 90 seconds)
+                                // This can be improved to compare only 2 steps by leaning into the drift tracking more aggressively, 
+                                // but this is a reasonable starting point.
+const pendingDrift = new Map(); // email → { offset, count } to track observed drift before confirming it
+const DRIFT_CONFIRM = 3;        // require 3 consecutive matches before committing
 
 /**
  * Verifies a TOTP code submitted by a user.
@@ -55,7 +62,7 @@ const clockDrift = new Map();
  * @param {string} submittedCode - The 6-digit code the user entered
  * @returns {object} - { valid: boolean, message: string }
  */
-function verifyCode(email, submittedCode) {
+function verifyCode(email, submittedCode, currentTime = Math.floor(Date.now() / 1000)) {
   // ──────────────────────────────────────────────────────
   // STEP 1: Retrieve the user's decrypted secret
   //
@@ -64,7 +71,10 @@ function verifyCode(email, submittedCode) {
   // ──────────────────────────────────────────────────────
 
   // TODO: get the secret
-
+  const secret = retrieveSecret(email);
+  if (!secret) {
+    return { valid: false, message: 'User not found' };
+  }
 
   // ──────────────────────────────────────────────────────
   // STEP 2: Check for replay
@@ -77,6 +87,10 @@ function verifyCode(email, submittedCode) {
   // ──────────────────────────────────────────────────────
 
   // TODO: check the usedCodes map
+  // usedCodes map format: {email -> {code, timestamp}}
+  if (usedCodes.has(email) && usedCodes.get(email).some(entry => entry.code === submittedCode)) {
+    return { valid: false, message: 'Code has already been used' };
+  }
 
 
   // ──────────────────────────────────────────────────────
@@ -104,7 +118,8 @@ function verifyCode(email, submittedCode) {
   // ──────────────────────────────────────────────────────
 
   // TODO: check the submitted code against allowed windows
-
+  // Get the user's current drift offset (default to 0 if not set)
+  const drift = clockDrift.get(email) || 0;
 
   // ──────────────────────────────────────────────────────
   // STEP 4: On success
@@ -119,7 +134,41 @@ function verifyCode(email, submittedCode) {
   // ──────────────────────────────────────────────────────
 
   // TODO: handle match/no-match
+  for (const delta of [0, -1, +1]) {
+    const code = generateTOTP(secret, 30, 0, 6, 'sha1', currentTime + (drift + delta) * 30);
+    if (submittedCode === code) {
+      if (delta === 0) {
+        // current step match, no drift adjustment needed
+        pendingDrift.delete(email); // clear any pending drift if the current code matches
+        
+        markCodeUsed(email, submittedCode);
+        return { valid: true, message: 'Code is valid (current step)' };
+      } else { // delta !== 0, past or future step match
+        // Record the new drift offset if this code matches a past or future step
+        const observed = drift + delta; // the offset this match implies
 
+        if (Math.abs(observed) <= MAX_DRIFT) { // Only consider it if it's within the maximum drift limit
+          const pending = pendingDrift.get(email);
+
+          if (pending && pending.offset === observed) {
+            pending.count++;
+
+            if (pending.count >= DRIFT_CONFIRM) { // seen this drift enough times, trust it
+              clockDrift.set(email, observed);
+              pendingDrift.delete(email);
+            }
+          } else {
+            pendingDrift.set(email, { offset: observed, count: 1 }); // start counting
+          }
+        }
+
+        markCodeUsed(email, submittedCode);
+        return { valid: true, message: `Code is valid (time step ${delta === -1 ? 'past' : 'future'}, drift adjusted)` };
+      }
+    }
+  }
+
+  return { valid: false, message: 'Invalid code' };
 }
 
 /**
@@ -134,7 +183,13 @@ function verifyCode(email, submittedCode) {
  */
 function markCodeUsed(email, code) {
   // TODO: store the code with a timestamp for later cleanup
+  const timestamp = Date.now() / 1000; // store in seconds for easier comparison
+  
+  if (!usedCodes.has(email)) {
+    usedCodes.set(email, []);
+  }
 
+  usedCodes.get(email).push({ code, timestamp });
 }
 
 /**
@@ -147,7 +202,17 @@ function markCodeUsed(email, code) {
  */
 function pruneExpiredCodes() {
   // TODO: iterate and remove old entries
+  const now = Date.now() / 1000;
 
+  for (const [email, entries] of usedCodes.entries()) {
+    const validEntries = entries.filter(entry => now - entry.timestamp < 60); // keep entries from the last 60 seconds
+
+    if (validEntries.length > 0) {
+      usedCodes.set(email, validEntries);
+    } else {
+      usedCodes.delete(email); // no valid entries left, remove the email key
+    }
+  }
 }
 
 module.exports = { verifyCode, pruneExpiredCodes };
