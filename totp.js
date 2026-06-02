@@ -45,7 +45,7 @@ function generateTOTP(key, timeStep = 30, t0 = 0, digits = 6, algorithm = 'sha1'
   // Hint: Math.floor() for the floor function.
   // ──────────────────────────────────────────────────────
 
-  // TODO: calculate T
+  // calculate T
   const T = Math.floor((currentTime - t0) / timeStep);
 
   // ──────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ function generateTOTP(key, timeStep = 30, t0 = 0, digits = 6, algorithm = 'sha1'
   //       Alternative: use BigInt and a loop to fill bytes.
   // ──────────────────────────────────────────────────────
 
-  // TODO: convert T to an 8-byte Buffer
+  // convert T to an 8-byte Buffer
   const buf = Buffer.alloc(8);
   const high = Math.floor(T / 2**32);
   const low = T % 2**32;
@@ -78,7 +78,7 @@ function generateTOTP(key, timeStep = 30, t0 = 0, digits = 6, algorithm = 'sha1'
   // The result is a 20-byte Buffer (for SHA-1).
   // ──────────────────────────────────────────────────────
 
-  // TODO: compute the HMAC digest as a Buffer
+  // compute the HMAC digest as a Buffer
   const hmac = crypto.createHmac(algorithm, key); // init with algo + key
   hmac.update(buf);                               // feed in the message (8-byte counter)
   const digest = hmac.digest();                   // get the HMAC result as a Buffer
@@ -105,7 +105,7 @@ function generateTOTP(key, timeStep = 30, t0 = 0, digits = 6, algorithm = 'sha1'
   //        (hash[offset+3] & 0xff)
   // ──────────────────────────────────────────────────────
 
-  // TODO: apply dynamic truncation to get a 31-bit integer
+  // apply dynamic truncation to get a 31-bit integer
   const offset = digest[digest.length - 1] & 0x0f; // mask to get low 4 bits
   const truncated = ((digest[offset] & 0x7f) << 24) |
                     ((digest[offset + 1] & 0xff) << 16) |
@@ -124,7 +124,7 @@ function generateTOTP(key, timeStep = 30, t0 = 0, digits = 6, algorithm = 'sha1'
   // Hint: String.prototype.padStart(digits, '0')
   // ──────────────────────────────────────────────────────
 
-  // TODO: reduce and zero-pad, then return the code string
+  // reduce and zero-pad, then return the code string
   const code = truncated % (10 ** digits);
   return code.toString().padStart(digits, '0');
 
@@ -152,7 +152,7 @@ function generateSecret(algorithm = 'sha1') {
   //       lengths will keep this clean.
   // ──────────────────────────────────────────────────────
 
-  // TODO: generate and return a random key of the correct length
+  // generate and return a random key of the correct length
   const keyLengths = {
     'sha1': 20,
     'sha256': 32,
