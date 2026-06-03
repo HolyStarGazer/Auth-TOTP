@@ -23,14 +23,22 @@
 const https = require('https');
 const readline = require('readline');
 const fs = require('fs');
+require('dotenv').config();
+
 
 // ──────────────────────────────────────────────────────
 // CONFIGURATION
 //
 // The server's base URL. Should match your .env settings.
 // ──────────────────────────────────────────────────────
-const SERVER_HOST = 'localhost';
-const SERVER_PORT = 3443;
+const SERVER_HOST = process.env.SERVER_HOST;
+const SERVER_PORT = process.env.SERVER_PORT;
+const TLS_CERT_PATH = process.env.TLS_CERT_PATH;
+
+if (!SERVER_HOST || !SERVER_PORT || !TLS_CERT_PATH) {
+  console.error('Error: SERVER_HOST, SERVER_PORT, and TLS_CERT_PATH must be set in .env');
+  process.exit(1);
+}
 
 // ──────────────────────────────────────────────────────
 // TLS HANDLING FOR SELF-SIGNED CERTS
@@ -53,7 +61,10 @@ const SERVER_PORT = 3443;
 // Pick one and set it up here.
 // ──────────────────────────────────────────────────────
 
-// TODO: set up the HTTPS agent
+// set up the HTTPS agent
+const agent = new https.Agent({
+  ca: fs.readFileSync(TLS_CERT_PATH)
+});
 
 
 // ──────────────────────────────────────────────────────
@@ -72,7 +83,15 @@ const SERVER_PORT = 3443;
 //   }
 // ──────────────────────────────────────────────────────
 
-// TODO: set up readline and the prompt helper
+// set up readline and the prompt helper
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+function prompt(question) {
+  return new Promise(resolve => rl.question(question, resolve));
+}
 
 
 /**
@@ -103,8 +122,27 @@ function postRequest(path, body) {
   // Handle errors (connection refused, etc.) gracefully.
   // ──────────────────────────────────────────────────────
 
-  // TODO: implement the HTTPS POST request
+  // implement the HTTPS POST request
+  const options = {
+    hostname: SERVER_HOST,
+    port: SERVER_PORT,
+    path: path,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    agent: agent
+  };
 
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let data = '';
+      
+      res.on('data', chunk => data += chunk); // response arrives in chunks
+      res.on('end', () => resolve({ statusCode: res.statusCode, body: JSON.parse(data) }));
+    });
+    req.on('error', reject);          // connection refused, TLS fail, etc.
+    req.write(JSON.stringify(body));
+    req.end();                        // nothing sends until you call end()
+  });
 }
 
 
@@ -131,8 +169,53 @@ async function main() {
   // Wrap the whole thing in try/catch for clean error handling.
   // ──────────────────────────────────────────────────────
 
-  // TODO: implement the interactive flow
+  // implement the interactive flow
+  try {
+    const email = await prompt('Enter your email: ');
 
+    const registerResponse = await postRequest('/register', { email });
+
+    switch (registerResponse.statusCode) {
+      case 200:
+        console.log('Account created');
+        break;
+      case 409:
+        console.log('Welcome back');
+        break;
+      default:
+        console.error(`Failed to request code: ${registerResponse.body.error}`);
+        return;
+    }
+
+    const requestResponse = await postRequest('/request-code', { email });
+
+    switch (requestResponse.statusCode) {
+      case 200:
+        console.log('Code sent successfully. Please check your email.');
+        break;
+      default:
+        console.error(`Failed to request code: ${requestResponse.body.error}`);
+        return;
+    }
+
+    const code = await prompt('Enter the code from your email: ');
+    const verifyResponse = await postRequest('/verify', { email, code });
+
+    switch (verifyResponse.statusCode) {
+      case 200:
+        console.log('Code is valid! Authentication successful.');
+        break;
+      case 401:
+        console.log('Invalid code. Authentication failed.');
+        break;
+      default:
+        console.error(`Failed to verify code: ${verifyResponse.body.error}`);
+    }
+  } catch (err) {
+    console.error('Error during interaction:', err);
+  } finally {
+    rl.close();
+  }
 }
 
 main();
