@@ -8,8 +8,7 @@ For local development, a self-signed certificate satisfies this.
 Run this from the `certs/` directory:
 
 ```bash
-openssl req -x509 -newkey rsa:2048 -keyout server.key -out server.crt \
-  -days 365 -nodes -subj "/CN=localhost"
+openssl req -x509 -newkey rsa:2048 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=localhost"
 ```
 
 This creates:
