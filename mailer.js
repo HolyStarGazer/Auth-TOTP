@@ -74,6 +74,31 @@ function createTransporter() {
 }
 
 /**
+ * Verifies that the SMTP transport can connect and authenticate.
+ *
+ * This is a thin wrapper around nodemailer's built-in
+ * transporter.verify(). We expose it (instead of the raw
+ * `transporter`) so callers like server.js can confirm SMTP is
+ * working WITHOUT reaching into this module's private internals —
+ * that keeps the transport encapsulated here in mailer.js.
+ *
+ * verify() opens a connection, runs the STARTTLS upgrade, and
+ * authenticates with the Gmail app password — exactly the same
+ * handshake a real send does, but without sending anything.
+ *
+ * Call this ONCE at server startup, not per email: it's a full
+ * round-trip to Gmail, so doing it on every send would double
+ * your latency for no benefit.
+ *
+ * @returns {Promise<true>} Resolves true on success; REJECTS if
+ *   the connection or auth fails (wrong app password, no network,
+ *   Gmail unreachable) — so callers should .catch() it.
+ */
+function verifyTransport() {
+  return transporter.verify();
+}
+
+/**
  * Sends a TOTP code to the specified email address.
  *
  * @param {string} recipientEmail - Where to send the code
@@ -107,14 +132,6 @@ async function sendCode(recipientEmail, code) {
   // ──────────────────────────────────────────────────────
 
   // compose and send the email
-  transporter.verify((err, success) => {
-    if (err) {
-      console.error('SMTP verify FAILED:', err);
-    } else {
-      console.log('SMTP verify OK - ready to send');
-    }
-  })
-
   const message = {
     from: process.env.GMAIL_USER,
     to: recipientEmail,
@@ -125,4 +142,4 @@ async function sendCode(recipientEmail, code) {
   return await transporter.sendMail(message);
 }
 
-module.exports = { sendCode };
+module.exports = { sendCode, verifyTransport };
